@@ -21,7 +21,7 @@ def deriv_sigmoid(val):
 
 class Network:
 
-    def __init__(self, layers_input, mag):
+    def __init__(self, layers_input, mag, r_rate=None):
         self.layer_sizes = layers_input
         self.layers = []
 
@@ -29,8 +29,11 @@ class Network:
 
         self.zs = []
         self.bias = []
-        self.error_layers = []
-        self.learn_rate = 0.5
+        self.error_layers = [[]]
+
+        self.count = 0
+
+        # ----------------------------------
 
         self.layer_registers = [66, 117, 105, 108, 116, 32, 66, 121, 32, 83, 97, 109, 32, 77, 99, 67, 111, 114, 109, 97, 99, 107]
         self.layer_registers_string_val = "\n\n"
@@ -41,26 +44,32 @@ class Network:
 
         layer_value_splitter(self.layer_registers_string_val, True)
 
-        if mag == -1:
-            self.rate_decay = 0.0000001
+        # ----------------------------------
+
+        if type(r_rate) is None:
+            self.learn_rate = 0.5
+            if mag == -1:
+                self.rate_decay = 0
+            else:
+                self.rate_decay = (0.5 - 0.0001) / mag
         else:
-            self.rate_decay = (0.5 - 0.0001) / mag
+            if mag == -1:
+                self.rate_decay = 0
+            else:
+                self.rate_decay = (r_rate - 0.0001) / mag
+            self.learn_rate = r_rate
 
         # Init Weights - Neuron in current layer as columns, neuron in next layer as rows, layer as number of weight layers (total layers - 1)
 
         ls = self.layer_sizes
         self.weights = [array([[uniform(-2, 2) for neuron in range(ls[layer])] for next_neuron in range(ls[layer + 1])]) for layer in range(len(ls) - 1)]
 
-        # self.weights = [array([[2, 2, 1], [-2, 0, 0]]), array([[0, -1]])]
-
-        # Init biases
-
         self.bias = [array([[0] for neuron in range(ls[col + 1])]) for col in range(len(ls) - 1)]
 
     def multiply(self):
-          for layer in range(len(self.weights)):
-                self.zs.append(add(matmul(self.weights[layer], self.layers[layer]), self.bias[layer]))
-                self.layers.append(sigmoid(self.zs[layer]))
+        for layer in range(len(self.weights)):
+            self.zs.append(add(matmul(self.weights[layer], self.layers[layer]), self.bias[layer]))
+            self.layers.append(sigmoid(self.zs[layer]))
 
     def calculate_error(self):
         difference = subtract(self.layers[-1], self.aim)
@@ -88,41 +97,41 @@ class Network:
         # self.layers.append(transpose([train_input]) / 255)
 
         self.aim = array([[0.0] for x in range(0, self.layer_sizes[-1])])  # Set the goal of the network
-        goal = train_goal
-        self.aim[goal][0] += 1
+
+        self.aim[train_goal][0] += 1
+        # print(f"TRAIN GOAL: {train_goal}")
 
         self.multiply()
 
-        pre_correct = self.layers
-
         self.calculate_error()
+
         self.correct_error()
 
         self.learn_rate -= self.rate_decay
 
-        return pre_correct
+        return self.layers
 
-    def save_network(self):
+    def save_network(self, weights_save, bias_save):
 
-        file = open("D:/Desktop/PythonProjects/NeuralNetworks/Network_Weights2.txt", "w")
+        file = open(weights_save, "w")
         file.write("")
         file.close()
-        file = open("D:/Desktop/PythonProjects/NeuralNetworks/Network_Weights2.txt", "a")
+        file = open(weights_save, "a")
         for matrix in self.weights:
             file.write(str(matrix.tolist()) + ", ")
         file.close()
 
-        file = open("D:/Desktop/PythonProjects/NeuralNetworks/Network_Bias2.txt", "w")
+        file = open(bias_save, "w")
         file.write("")
         file.close()
-        file = open("D:/Desktop/PythonProjects/NeuralNetworks/Network_Bias2.txt", "a")
+        file = open(bias_save, "a")
         for vector in self.bias:
             file.write(str(vector.tolist()) + ", ")
         file.close()
 
-    def load(self):
+    def load(self, weights_save, bias_save):
 
-        file = open("D:/Desktop/PythonProjects/NeuralNetworks/Network_Weights2.txt", "r")
+        file = open(weights_save, "r")
 
         data = file.read()
 
@@ -138,7 +147,7 @@ class Network:
             load_weights.append(list(data[matrix]))
             load_weights[matrix] = array(load_weights[matrix])
 
-        file = open("D:/Desktop/PythonProjects/NeuralNetworks/Network_Bias2.txt", "r")
+        file = open(bias_save, "r")
 
         data = file.read()
 
@@ -157,24 +166,12 @@ class Network:
         self.weights = load_weights
         self.bias = load_bias
 
-    def test(self, test_input, test_goal, printout=False):
+    def test(self, test_input):
 
         self.layers = []
         self.zs = []
-        self.layers.append(transpose([test_input]) / 255)
-        goal = test_goal
+        self.layers.append(transpose([test_input]))
+
         self.multiply()
 
-        temp = self.layers[-1].tolist()
-        temp2 = []
-        for i in temp:
-            for ii in i:
-                  temp2.append(ii)
-
-        if printout:
-            print("Goal {} Got {}".format(goal, temp2.index(max(temp2))))
-
-        if goal == temp2.index(max(temp2)):
-            return True
-        else:
-            return False
+        return self.layers
